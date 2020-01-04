@@ -11,6 +11,26 @@ bool g_bIsGhost[MAXPLAYERS+1]
 
 int g_iCollision;
 
+float g_fNewHullValues[] = {
+	// SEE https://developer.valvesoftware.com/wiki/Player_Entity
+	 0.0,   0.0,   64.0,    // Eye position (m_vView)
+
+	 0.0,   0.0,  0.0,      // hull min (m_vHullMin)
+	 0.1,   0.1,  0.1,      // hull max (m_vHullMax)
+
+	 0.0,   0.0,   0.0,     // duck hull min (m_vDuckHullMin)
+	 0.1,   0.1,   0.1,     // duck hull max (m_vDuckHullMax)
+	 0.0,   0.0,   28.0,    // duck eye position (m_vDuckView)
+
+	-10.0, -10.0, -10.0,    // observer hull min (m_vObsHullMin)
+	 10.0 , 10.0,  10.0,    // observer hull max (m_vObsHullMax)
+
+	 0.0,   0.0,   14.0     // dead view height (m_vDeadViewHeight)
+};
+float g_fOldHullValues[sizeof(g_fNewHullValues)];
+
+Address g_CSViewVectors;
+
 public Plugin myinfo = {
 	name = "amuRedie",
 	author = "hiiamu",
@@ -32,7 +52,7 @@ public void OnPluginStart() {
 	RegConsoleCmd("sm_ghost", Client_Redie, "Respawn when dead");
 	RegConsoleCmd("sm_unredie", Client_UnRedie, "Return to spec after redie");
 	RegConsoleCmd("sm_unghost", Client_UnRedie, "Return to spec after redie");
-	RegAdminCmd("sm_listghosts", Admin_ListRedie, ADMFLAG_GENERIC, "Lists players in redie");
+	RegAdminCmd("sm_listghosts", Admin_ListRedie, ADMFLAG_GENERIC, "Spectate players in redie");
 	//RegConsoleCmd("sm_rediemenu", Client_RedieMenu, "Show redie menu");
 
 	g_iCollision = FindSendPropInfo("CBaseEntity", "m_CollisionGroup");
@@ -43,11 +63,40 @@ public void OnPluginStart() {
 	}
 }
 
+// was gonna do OnPluginStart, but not sure if GameRules has been initialized then
+public void OnMapStart() {
+	Handle hGameConf = LoadGameConfigFile("changehull.games");
+	if(hGameConf == INVALID_HANDLE)
+		SetFailState("Can't find changehull.games.txt gamedata.");
+
+	g_CSViewVectors = GameConfGetAddress(hGameConf, "g_CSViewVectors");
+	if(g_CSViewVectors == Address_Null)
+		SetFailState("Couldn't get address of g_CSViewVectors");
+
+/*
+	for( int i = 0; i < sizeof( g_fNewHullValues ); i++ ) {
+		g_fOldHullValues[i] = view_as<float>( LoadFromAddress( g_CSViewVectors + view_as<Address>( i*4 ), NumberType_Int32 ) );
+		StoreToAddress( g_CSViewVectors + view_as<Address>( i*4 ), view_as<int>( g_fNewHullValues[i] ), NumberType_Int32 );
+	}
+*/
+	delete hGameConf;
+
+	for(int i = 1; i <= MaxClients; i++) {
+		if(IsClientInGame(i))
+			OnClientPutInServer(i);
+	}
+}
+
 public void OnClientPutInServer(int client) {
 	if(IsValidClient(client)) {
 		g_bIsGhost[client] = false;
 		g_bNoclipEnabled[client] = false;
 	}
+}
+
+public void OnPluginEnd() {
+	// restore the original hull values, if we patched them.
+	RepatchGame();
 }
 
 public Action Client_Redie(int client, int args) {
@@ -118,13 +167,15 @@ void Redie(int client) {
 	}
 
 	g_bIsGhost[client] = true;
+	UnpatchGame();
 	CS_RespawnPlayer(client);
 	return;
 }
 
 void UnRedie(int client) {
-	if (g_bIsGhost[client]) {
+	if(g_bIsGhost[client]) {
 		g_bIsGhost[client] = false;
+		RepatchGame();
 		SetEntProp(client, Prop_Send, "m_lifeState", 0);
 		ForcePlayerSuicide(client);
 
@@ -177,8 +228,10 @@ public Action OnSoundPlayed(int[] clients, int &numClients, char[] sample, int &
 
 public Action Event_RoundEnd(Event event, const char[] name, bool dontBroadcast) {
 	for(int i = 1; i <= MaxClients; i++) {
-		if(IsValidClient(i) && g_bIsGhost[i])
+		if(IsValidClient(i) && g_bIsGhost[i]) {
 			UnRedie(i);
+			RepatchGame();
+		}
 	}
 }
 
@@ -189,6 +242,15 @@ public Action Timer_Advert(Handle timer) {
 }
 
 public Action Hook_HideGhosts(int entity, int client) {
+	if(g_bIsGhost[entity]) {
+		if(g_bIsGhost[client] || !IsPlayerAlive(client))
+			return Plugin_Continue;
+
+		return Plugin_Handled;
+	}
+
+	return Plugin_Continue;
+/*
 	if(!g_bIsGhost[client] && g_bIsGhost[entity])
 		return Plugin_Handled;
 
@@ -196,6 +258,7 @@ public Action Hook_HideGhosts(int entity, int client) {
 		return Plugin_Continue;
 
 	return Plugin_Continue;
+*/
 }
 
 // extensive valid check
@@ -206,4 +269,20 @@ stock bool IsValidClient(int client) {
 	if (IsFakeClient(client)) return false;
 	if (IsClientSourceTV(client))return false;
 	return IsClientInGame(client);
+}
+
+void UnpatchGame() {
+	if(g_CSViewVectors != Address_Null) {
+		for(int i = 0; i < sizeof(g_fNewHullValues); i++) {
+			g_fOldHullValues[i] = view_as<float>(LoadFromAddress(g_CSViewVectors + view_as<Address>(i*4), NumberType_Int32));
+			StoreToAddress(g_CSViewVectors + view_as<Address>(i*4), view_as<int>(g_fNewHullValues[i]), NumberType_Int32);
+		}
+	}
+}
+
+void RepatchGame() {
+	if(g_CSViewVectors != Address_Null) {
+		for(int i = 0; i < sizeof(g_fOldHullValues); i++)
+			StoreToAddress(g_CSViewVectors + view_as<Address>( i*4 ), view_as<int>( g_fOldHullValues[i] ), NumberType_Int32 );
+	}
 }
