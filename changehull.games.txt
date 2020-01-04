@@ -1,0 +1,40 @@
+"Games"
+{
+	"csgo"
+	{
+		"Addresses"
+		{
+			"g_CSViewVectors"
+			{
+				"windows"
+				{
+					"signature" "g_pGameRules"
+					"read" "2" // g_pGameRules
+					"read" "0" // CCSGameRules object
+					"read" "0" // CCSGameRules vtable
+					"read" "120" // CCSGameRules::GetViewVectors()
+					"read" "1" // g_CSViewVectors
+				}
+				"linux"
+				{
+					"signature" "g_pGameRules"
+					"read" "2"
+					"read" "0"
+					"read" "0"
+					"read" "124"
+					"read" "2"
+				}
+			}
+		}
+
+		"Signatures"
+		{
+			"g_pGameRules"
+			{
+				"library" "server"
+				"windows" "\x8B\x2A\x2A\x2A\x2A\x2A\x8B\x2A\x8B\x2A\x2A\x2A\x2A\x2A\xFF\x2A\x84\x2A\x75\x2A\x8B\x2A\x2A\x2A\x2A\x2A\x85"
+				"linux" "\x2A\xA1\x2A\x2A\x2A\x2A\x8B\x5D\x08\x85\xC0\x74\x2A\x8B"
+			}
+		}
+	}
+}
