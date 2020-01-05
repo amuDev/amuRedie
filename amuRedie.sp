@@ -12,7 +12,7 @@ bool g_bIsGhost[MAXPLAYERS+1]
 int g_iCollision;
 
 float g_fNewHullValues[] = {
-	// SEE https://developer.valvesoftware.com/wiki/Player_Entity
+// SEE https://developer.valvesoftware.com/wiki/Player_Entity
 	 0.0,   0.0,   64.0,    // Eye position (m_vView)
 
 	 0.0,   0.0,  0.0,      // hull min (m_vHullMin)
@@ -176,7 +176,7 @@ void UnRedie(int client) {
 	if(g_bIsGhost[client]) {
 		g_bIsGhost[client] = false;
 		RepatchGame();
-		SetEntProp(client, Prop_Send, "m_lifeState", 0);
+		//SetEntProp(client, Prop_Send, "m_lifeState", 0);
 		ForcePlayerSuicide(client);
 
 		ReplyToCommand(client, "\x01[\x03Redie\x01] \x04You have been removed from redie.");
@@ -201,7 +201,7 @@ public Action Event_PlayerSpawn(Event event, const char[] name, bool dontBroadca
 
 	if(IsValidClient(client)) {
 		if(g_bIsGhost[client]) {
-			SetEntProp(client, Prop_Send, "m_lifeState", 1);
+			//SetEntProp(client, Prop_Send, "m_lifeState", 1);
 			SetEntData(client, g_iCollision, 2, 4, true);
 			SetEntProp(client, Prop_Send, "m_nHitboxSet", 2);
 			SetEntityRenderMode(client, RENDER_TRANSCOLOR);
